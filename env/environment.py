@@ -1,18 +1,3 @@
-# Copyright 2018 Francis Y. Yan, Jestin Ma
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-#     Unless required by applicable law or agreed to in writing, software
-#     distributed under the License is distributed on an "AS IS" BASIS,
-#     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#     See the License for the specific language governing permissions and
-#     limitations under the License.
-
-
 import os
 from os import path
 import sys
@@ -66,7 +51,7 @@ class Environment(object):
         """Run sender in env, get final reward of an episode, reset sender."""
 
         sys.stderr.write('Obtaining an episode from environment...\n')
-        self.sender.run()
+        return self.sender.run()
 
     def cleanup(self):
         if self.sender:

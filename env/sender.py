@@ -1,18 +1,3 @@
-# Copyright 2018 Francis Y. Yan, Jestin Ma
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-#     Unless required by applicable law or agreed to in writing, software
-#     distributed under the License is distributed on an "AS IS" BASIS,
-#     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#     See the License for the specific language governing permissions and
-#     limitations under the License.
-
-
 import time
 import sys
 import json
@@ -184,6 +169,7 @@ class Sender(object):
 
     def recv(self):
         serialized_ack, addr = self.sock.recvfrom(1600)
+        k=-1
 
         if addr != self.peer_addr:
             return
@@ -226,15 +212,18 @@ class Sender(object):
                     self.step_cnt = 0
                     self.running = False
 
-                    self.compute_performance()
+                    k=self.compute_performance()
+        return k
 
     def run(self):
         TIMEOUT = 1000  # ms
 
         self.poller.modify(self.sock, ALL_FLAGS)
         curr_flags = ALL_FLAGS
+        r = -1
 
         while self.running:
+            #print("while self.running")
             if self.window_is_open():
                 if curr_flags != ALL_FLAGS:
                     self.poller.modify(self.sock, ALL_FLAGS)
@@ -256,16 +245,21 @@ class Sender(object):
                     sys.exit('Error occurred to the channel')
 
                 if flag & READ_FLAGS:
-                    self.recv()
+                    r = self.recv()
 
                 if flag & WRITE_FLAGS:
                     if self.window_is_open():
                         self.send()
+        return r
 
     def compute_performance(self):
+        print("****************IN COMPUTE_PERFORMANCE*********************")
         duration = curr_ts_ms() - self.ts_first
         tput = 0.008 * self.delivered / duration
         perc_delay = np.percentile(self.rtt_buf, 95)
+        print(tput)
+        print(perc_delay)
+        return 10*tput - perc_delay
 
         with open(path.join(project_root.DIR, 'env', 'perf'), 'a', 0) as perf:
             perf.write('%.2f %d\n' % (tput, perc_delay))
