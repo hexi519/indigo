@@ -64,17 +64,15 @@ def get_open_udp_port():
     s.close()
     return port
 
-
 def normalize(state):
+    """ 除了最后一个状态是除以5000以外，其他所有都是除以200 """
     return [state[0] / 200.0, state[1] / 200.0,
             state[2] / 200.0, state[3] / 5000.0]
-
 
 def one_hot(action, action_cnt):
     ret = [0.0] * action_cnt
     ret[action] = 1.0
     return ret
-
 
 def softmax(x):
     e_x = np.exp(x - np.max(x))

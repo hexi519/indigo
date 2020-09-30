@@ -27,40 +27,43 @@ class Receiver(object):
         self.peer_addr = (ip, port)
 
         # UDP socket and poller
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)    #TODO 怎么发的是UDP的包...能保证可靠传输么...
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
 
         self.poller = select.poll()
-        self.poller.register(self.sock, ALL_FLAGS)
+        self.poller.register(self.sock, ALL_FLAGS)  # 注册当前这个文件描述符，用于监听
 
     def cleanup(self):
         self.sock.close()
 
+    # 发送第二次握手
     def construct_ack_from_data(self, serialized_data):
         """Construct a serialized ACK that acks a serialized datagram."""
 
-        data = datagram_pb2.Data()
+        data = datagram_pb2.Data()  #* protobuf有空可以了解下，这个就是里面一系列的
         data.ParseFromString(serialized_data)
 
+        # 把所有来的信息都放到ack里面了，也许是为了方便记录
         ack = datagram_pb2.Ack()
         ack.seq_num = data.seq_num
-        ack.send_ts = data.send_ts
+        ack.send_ts = data.send_ts      # send_ts是什么
         ack.sent_bytes = data.sent_bytes
         ack.delivered_time = data.delivered_time
         ack.delivered = data.delivered
         ack.ack_bytes = len(serialized_data)
 
         return ack.SerializeToString()
-
+    
+    # 发送第一次握手
     def handshake(self):
         """Handshake with peer sender. Must be called before run()."""
-
+        #? 网络的基础还需要补一补2333
         self.sock.setblocking(0)  # non-blocking UDP socket
 
         TIMEOUT = 1000  # ms
 
         retry_times = 0
-        self.poller.modify(self.sock, READ_ERR_FLAGS)
+        self.poller.modify(self.sock, READ_ERR_FLAGS)   # 除了select.POLLOUT以外的时间都监听233  （ 注册的时候是ALL_FLAGS
 
         while True:
             self.sock.sendto('Hello from receiver', self.peer_addr)
@@ -84,7 +87,7 @@ class Receiver(object):
                     sys.exit('Channel closed or error occurred')
 
                 if flag & READ_FLAGS:
-                    msg, addr = self.sock.recvfrom(1600)
+                    msg, addr = self.sock.recvfrom(1600)  # get return of(msg,addr) data是包含接收数据的字符串，address是发送数据的套接字地址
 
                     if addr == self.peer_addr:
                         if msg != 'Hello from sender':
@@ -95,8 +98,9 @@ class Receiver(object):
                                 self.sock.sendto(ack, self.peer_addr)
                         return
 
+    # 发了第二次握手包之后就开始keep收包
     def run(self):
-        self.sock.setblocking(1)  # blocking UDP socket
+        self.sock.setblocking(1)  # blocking UDP socket  # TODO 这里又设置成blocking的了...
 
         while True:
             serialized_data, addr = self.sock.recvfrom(1600)

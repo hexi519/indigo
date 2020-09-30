@@ -34,17 +34,18 @@ def format_actions(action_list):
     The dictionary keys are the unique indices (to retrieve the action) and
     the values are lists ['op', val], such as ['+', '2.0'].
     """
-    return {idx: [action[0], float(action[1:])]
-                  for idx, action in enumerate(action_list)}
+    return {idx: [action[0], float(action[1:])] 
+                  for idx, action in enumerate(action_list)}    # e.g. {0: ["/" ,2.0] , 1: ["-" ,10.0]}
 
 
 class Sender(object):
-    # RL exposed class/static variables
+    # RL exposed class/static variables 不随着实例而变化
     max_steps = 1000
     state_dim = 4
-    action_mapping = format_actions(["/2.0", "-10.0", "+0.0", "+10.0", "*2.0"])
+    action_mapping = format_actions(["/2.0", "-10.0", "+0.0", "+10.0", "*2.0"])     #* 这个有点草率哈... 不能输出连续的是么？因为效果不好？
     action_cnt = len(action_mapping)
 
+    # 初始化一个socket 以及 相应的拥塞变量
     def __init__(self, port=0, train=False, debug=False):
         self.train = train
         self.debug = debug
@@ -56,7 +57,7 @@ class Sender(object):
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind(('0.0.0.0', port))
         sys.stderr.write('[sender] Listening on port %s\n' %
-                         self.sock.getsockname()[1])
+                         self.sock.getsockname()[1])  # getsockname返回本地ip和端口号
 
         self.poller = select.poll()
         self.poller.register(self.sock, ALL_FLAGS)
@@ -69,39 +70,40 @@ class Sender(object):
         # congestion control related
         self.seq_num = 0
         self.next_ack = 0
-        self.cwnd = 10.0
-        self.step_len_ms = 10
+        self.cwnd = 10.0       # TODO 是一个double值？ just change the sending rate
+        self.step_len_ms = 10   #! 一次操纵是10ms  --> Orca呢？ 
 
         # state variables for RLCC
         self.delivered_time = 0
         self.delivered = 0
         self.sent_bytes = 0
 
-        self.min_rtt = float('inf')
+        self.min_rtt = float('inf') #* 记录最小rtt、delay、sending rate 、delivey rate
         self.delay_ewma = None
         self.send_rate_ewma = None
         self.delivery_rate_ewma = None
 
-        self.step_start_ms = None
+        self.step_start_ms = None   #? 这个？
         self.running = True
 
         if self.train:
             self.step_cnt = 0
 
-            self.ts_first = None
-            self.rtt_buf = []
+            self.ts_first = None    #?
+            self.rtt_buf = []   #?只记录rtt就可以?
 
     def cleanup(self):
         if self.debug and self.sampling_file:
             self.sampling_file.close()
         self.sock.close()
 
+    # 收到第一次握手 以及发送第三次；模仿了TCP的三次握手。但是是否对整体的性能有所保证？毕竟不像TCP，保序呀
     def handshake(self):
         """Handshake with peer receiver. Must be called before run()."""
-
         while True:
             msg, addr = self.sock.recvfrom(1600)
 
+            # 还没建立起连接，所以收到了Hello，而且self.peer_addr还为空
             if msg == 'Hello from receiver' and self.peer_addr is None:
                 self.peer_addr = addr
                 self.sock.sendto('Hello from sender', self.peer_addr)
@@ -111,6 +113,7 @@ class Sender(object):
 
         self.sock.setblocking(0)  # non-blocking UDP socket
 
+    # 设置policy（传入一个function
     def set_sample_action(self, sample_action):
         """Set the policy. Must be called before run()."""
 
@@ -165,6 +168,7 @@ class Sender(object):
         self.cwnd = max(2.0, self.cwnd)
 
     def window_is_open(self):
+        """获取 """
         return self.seq_num - self.next_ack < self.cwnd
 
     def send(self):
@@ -231,15 +235,15 @@ class Sender(object):
     def run(self):
         TIMEOUT = 1000  # ms
 
-        self.poller.modify(self.sock, ALL_FLAGS)
+        self.poller.modify(self.sock, ALL_FLAGS)    
         curr_flags = ALL_FLAGS
 
         while self.running:
-            if self.window_is_open():
+            if self.window_is_open():   # 还有发送的余地
                 if curr_flags != ALL_FLAGS:
                     self.poller.modify(self.sock, ALL_FLAGS)
                     curr_flags = ALL_FLAGS
-            else:
+            else:   # 只能收 不能发
                 if curr_flags != READ_ERR_FLAGS:
                     self.poller.modify(self.sock, READ_ERR_FLAGS)
                     curr_flags = READ_ERR_FLAGS

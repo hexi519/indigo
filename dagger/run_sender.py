@@ -14,7 +14,6 @@
 #     See the License for the specific language governing permissions and
 #     limitations under the License.
 
-
 import argparse
 import project_root
 import numpy as np
@@ -24,35 +23,36 @@ from env.sender import Sender
 from models import DaggerLSTM
 from helpers.helpers import normalize, one_hot, softmax
 
-
 class Learner(object):
     def __init__(self, state_dim, action_cnt, restore_vars):
         self.aug_state_dim = state_dim + action_cnt
         self.action_cnt = action_cnt
-        self.prev_action = action_cnt - 1
+        self.prev_action = action_cnt - 1   # 初始化先随便设置一个数
 
         with tf.variable_scope('global'):
-            self.model = DaggerLSTM(
-                state_dim=self.aug_state_dim, action_cnt=action_cnt)
+            self.model = DaggerLSTM(    
+                state_dim=self.aug_state_dim, action_cnt=action_cnt)    # 传入的时候是state和action一起传入作为真正的状态
+                # TODO 这有什么影响 要想下 
 
-        self.lstm_state = self.model.zero_init_state(1)
+        self.lstm_state = self.model.zero_init_state(1) #TODO
 
         self.sess = tf.Session()
 
         # restore saved variables
-        saver = tf.train.Saver(self.model.trainable_vars)
+        saver = tf.train.Saver(self.model.trainable_vars)   # TODO
         saver.restore(self.sess, restore_vars)
 
         # init the remaining vars, especially those created by optimizer
+        # TODO 为什么要一部分初始化 一部分不要 没有很懂
         uninit_vars = set(tf.global_variables())
         uninit_vars -= set(self.model.trainable_vars)
         self.sess.run(tf.variables_initializer(uninit_vars))
 
     def sample_action(self, state):
-        norm_state = normalize(state)
+        norm_state = normalize(state)  
 
         one_hot_action = one_hot(self.prev_action, self.action_cnt)
-        aug_state = norm_state + one_hot_action
+        aug_state = norm_state + one_hot_action # 归一化后的状态以及one-hot编码后的状态
 
         # Get probability of each action from the local network.
         pi = self.model
@@ -61,10 +61,11 @@ class Learner(object):
             pi.state_in: self.lstm_state,
         }
         ops_to_run = [pi.action_probs, pi.state_out]
+        # TODO 这里没有很明白，并没有指定模型啊？ action的维度大小
         action_probs, self.lstm_state = self.sess.run(ops_to_run, feed_dict)
 
         # Choose an action to take
-        action = np.argmax(action_probs[0][0])
+        action = np.argmax(action_probs[0][0]) # TODO 需要看下维度
         self.prev_action = action
 
         # action = np.argmax(np.random.multinomial(1, action_probs[0] - 1e-5))
@@ -77,7 +78,7 @@ class Learner(object):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('port', type=int)
-    parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--debug', action='store_true')  # TODO 不知道有何用
     args = parser.parse_args()
 
     sender = Sender(args.port, debug=args.debug)
